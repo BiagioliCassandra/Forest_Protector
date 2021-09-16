@@ -48,6 +48,9 @@ public class EnemyMove : MonoBehaviour
     /// /// </summary>
     private void Update()
     {
+        
+        agent.SetDestination(target.position);
+        
         if (Vector3.Distance(transform.position, target.position) <= humain.distanceForNextPoint)
         {
             Debug.Log("getnext");
@@ -70,14 +73,12 @@ public class EnemyMove : MonoBehaviour
         {
             waypointsIndex = 0;
             target = wayPoint.position[0];
-            agent.SetDestination(target.position);
             return;
         }
         
         //Maj du point
         waypointsIndex++;
         target = wayPoint.position[waypointsIndex];
-        agent.SetDestination(target.position);
     }
 
     #endregion

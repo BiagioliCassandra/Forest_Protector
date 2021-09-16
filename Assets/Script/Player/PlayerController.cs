@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace Forest_Protector
 {
-    [RequireComponent(typeof(States))]
     [RequireComponent(typeof(PlayerInput))]
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
@@ -15,16 +15,15 @@ namespace Forest_Protector
 
         [Header("StatMove")]
         [SerializeField] private float moveSpeed = 5.0f;
-
         [SerializeField] private float turnSmoothTime = 0.1f;
-
         [SerializeField] private float turnSmoothVelocity = 0.1f;
 
-        [Header("Variables Mouvement")]
+        [Header("Variables Movement")]
         private float _horizontal;
         private float _vertical;
-        private Vector3 _mouvement;
+        private Vector3 _movement;
         private Vector3 _direction = Vector3.zero;
+        private bool _canMoving = true;
 
 /*        [Header("Variables Dash")]
         public float dashTimeMax = 2.0f;
@@ -34,22 +33,24 @@ namespace Forest_Protector
 
 
         [Header("Variables Jump")]
-        private float _jump;
+        private CharacterController controller;
+        private Vector3 playerVelocity;
+        private bool groundedPlayer;
+        private float playerSpeed = 2.0f;
+        private float jumpHeight = 1.0f;
+        private float gravityValue = -9.81f;
 
-        public float gravity = 9.81f;
-        public float jumpForce = 5f;
+        [Header("Canvas")]
+        public TMP_Text manaText;
+
+        [Header("Weapon Properties")]
+        public GameObject woodWeapon;
 
         [Header("Componnent")]
         private Camera _cam;
         private CharacterController _cc;
         private PlayerInput _inputs;
-        private States _states;
-
-        [Header("Collider")]
-        public BoxCollider groundedCollider;
-        [Tooltip("Layer permettant de sauter")]
-        public LayerMask groundLayer;
-
+        private Animator _animator;
         #endregion
 
         #region Build In Methods
@@ -60,23 +61,34 @@ namespace Forest_Protector
             //Récup Component
             _cam = Camera.main;
             _cc = GetComponent<CharacterController>();
-            _inputs = GetComponent<PlayerInput>();
-            _states = GetComponent<States>();
-
-            //Verif Collid
-            if (!groundedCollider)
-            {
-                Debug.LogError("no Grounded Collider");
-            }
+            _inputs = PlayerInput.Instance;
+            _animator = GetComponent<Animator>();
         }
 
         // Update is called once per frame
         void Update()
         {
-            Locomotion();
-            Jump();
-            //StartCoroutine(Dash());
-            SetStates();
+            if (_cc.isGrounded && playerVelocity.y < 0)
+            {
+                playerVelocity.y = 0f;
+            }
+
+            Vector3 move = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+            _cc.Move(move * Time.deltaTime * playerSpeed);
+
+            if (move != Vector3.zero)
+            {
+                gameObject.transform.forward = move;
+            }
+
+            //Si le personnage est autorisé à bouger, il peut se mouvoir et sauter
+            if (_canMoving)
+            {
+                //Locomotion();
+                Jump();
+                //StartCoroutine(Dash());
+            }
+            //UpdateAnimations();
         }
 
         #endregion
@@ -84,7 +96,7 @@ namespace Forest_Protector
         #region  Custom Methods
 
         /// <summary>
-        /// Fonction permettant le déplacement du joueurs
+        /// Fonction permettant le déplacement du joueur
         /// </summary>
         void Locomotion()
         {
@@ -93,8 +105,8 @@ namespace Forest_Protector
                 return;
             }
 
-            _horizontal = _inputs.Mouvement.x;
-            _vertical = _inputs.Mouvement.y;
+            _horizontal = _inputs.Movement.x;
+            _vertical = _inputs.Movement.y;
 
             _direction.Set(_horizontal, 0, _vertical);
 
@@ -109,7 +121,117 @@ namespace Forest_Protector
 
                 _direction = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
             }
-            _mouvement = _direction.normalized * (moveSpeed * Time.deltaTime);
+            _movement = _direction.normalized * (moveSpeed * Time.deltaTime);
+        }
+
+        /// <summary>
+        /// Fonction gérant le saut, les animations du saut, la force du saut et l'application de la gravité
+        /// </summary>
+        void Jump()
+        {
+            // Changes the height position of the player..
+            if (_inputs.Jump && _cc.isGrounded)
+            {
+                _animator.SetBool("Jump", true);
+                playerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
+            }
+            _animator.SetBool("Jump", false);
+
+            playerVelocity.y += gravityValue * Time.deltaTime;
+            _cc.Move(playerVelocity * Time.deltaTime);
+
+            /*            if (_cc.isGrounded)
+                        {
+                            _jump = -gravity * coefGravity;
+                            if (_inputs.Jump)
+                            {
+                                _animator.SetBool("Jump", true);
+                                _jump = jumpForce;
+                            }
+                        }
+                        else
+                        {
+                            _animator.SetBool("Jump", false);
+                            _jump -= gravity * Time.deltaTime;
+                        }
+
+                        _movement += _jump * Vector3.up * Time.deltaTime;
+                        Debug.Log(_movement);
+
+                        _cc.Move(_movement);*/
+        }
+
+        /// <summary>
+        /// Fonction activant l'arme permettant de voir l'arme lors de l'attaque
+        /// </summary>
+        void AttackStart()
+        {
+            if(woodWeapon)
+            {
+                woodWeapon.SetActive(true);
+            }
+        }
+
+        /// <summary>
+        /// Fonction permettant d'interdire au joueur de bouger pendant les animations d'attaques et de jump idle
+        /// </summary>
+        void NotMoveStart()
+        {
+            _canMoving = false;
+        }
+
+        /// <summary>
+        /// Fonction désactivant l'arme une fois que la frame de l'event de l'animation choisit est passée
+        /// </summary>
+        void AttackEnd()
+        {
+            if (woodWeapon)
+            {
+                woodWeapon.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Fonction permettant au joueur de re-bouger une fois les animations attaques ou jump idle terminées
+        /// </summary>
+        void NotMoveEnd()
+        {
+            _canMoving = true;
+        }
+
+        /// <summary>
+        /// Fonction permettant la maj des animations pendant la partie
+        /// </summary>
+        void UpdateAnimations()
+        {
+            if (!_animator) return;
+
+            _animator.SetBool("Grounded", _cc.isGrounded);
+
+            if (!_cc.isGrounded)
+            {
+                _animator.SetFloat("VerticalSpeed", playerVelocity.y);
+            }
+            else
+            {
+                if (_inputs.Attack)
+                {
+                    if (mana > 0)
+                    {
+                        _animator.SetTrigger("Attack");
+                    }
+                    else
+                    {
+                        manaText.color = Color.red;
+                    }  
+                }
+                else
+                {
+                    _animator.ResetTrigger("Attack");
+                }
+            }
+            _animator.SetBool("Walk", true);
+            _animator.SetFloat("Velocity", _direction.magnitude);
         }
 
         /// <summary>
@@ -132,65 +254,6 @@ namespace Forest_Protector
         /// <summary>
         /// Fonction permettant au joueur de sauter
         /// </summary>
-        void Jump()
-        {
-            if (_cc.isGrounded)
-            {
-                _jump = -gravity * gravity;
-                if (_inputs.Jump)
-                {
-                    _jump = jumpForce;
-                }
-            }
-            else
-            {
-                if (Mathf.Approximately(_jump, 0))
-                {
-                    _jump = 0f;
-                }
-
-                _jump -= gravity * Time.deltaTime;
-            }
-
-            _mouvement += _jump * Vector3.up * Time.deltaTime;
-
-            _cc.Move(_mouvement);
-        }
-
-        void SetStates()
-        {
-            if (!_states) return;
-
-            //EN COURS JUMP
-
-            Collider[] colliders = Physics.OverlapBox(groundedCollider.transform.position + groundedCollider.center, groundedCollider.size / 2f, transform.rotation, groundLayer);
-
-            if (colliders.Length > 0)
-            {
-                if (colliders.Length >= 1) //Pas sur a 100 de cette phase la
-                {
-                    //Logiquement ici on detecte qu'il y as plus qu'un collider, donc il devrait être grounded
-                    Debug.Log("Collider = 1 voir plus");
-                    _states.grounded = true;
-                }
-                else if (colliders.Length < 1)
-                {
-                    _states.grounded = false;
-                    Debug.Log("-1 collider");
-                }
-            }
-            else
-            {
-                Debug.Log("No Collider detected");
-            }
-        }
-
-        private void OnDrawGizmos()
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawCube(groundedCollider.transform.position + groundedCollider.center, groundedCollider.size / 2f);
-        }
         #endregion
-
     }
 }
