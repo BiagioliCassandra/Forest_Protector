@@ -8,7 +8,6 @@ namespace Forest_Protector
     public class ChangeColor : MonoBehaviour
     {
         public PlayerController player;
-        public TMP_Text manaText;
 
         private PlayerInput _inputs;
 
@@ -20,14 +19,11 @@ namespace Forest_Protector
         // Update is called once per frame
         void Update()
         {
-            if(player.GetComponentInChildren<Canvas>().isActiveAndEnabled)
+            if(_inputs.Interaction)
             {
-                if(_inputs.Interaction)
-                {
-                    gameObject.GetComponent<Renderer>().material.color = new Color(255, 0, 0);
-                    player.mana -= 10;
-                    manaText.text = "Mana : " + player.mana + " / 50";
-                }
+                gameObject.GetComponent<Renderer>().material.color = new Color(255, 0, 0);
+                player.mana -= 10;
+                player.manaText.text = "Mana : " + player.mana + " / 50";
             }
             else
             {
